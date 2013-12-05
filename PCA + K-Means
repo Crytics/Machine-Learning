@@ -4,7 +4,7 @@
 # Created by  : Adrian Low
 # Updated by  : Adam Nguyen
 # Created at  : 11/07/2013
-# Updated at  : xx/xx/xxxx
+# Updated at  : 11/10/2013
 # Description : K-Means Clustering on Survey
 ############################################
 
@@ -28,14 +28,14 @@ head(norm_vals)
 summary(norm_vals)
 
 id_list <- x_tmp[,1]
-val_list <- x_tmp[,2:length(x_tmp[1,])]		
+val_list <- x_tmp[,2:length(x_tmp[1,])]                
 
 #Normalize prior to clustering
-norm_vals <- t(scale(t(val_list)))		# subtract by mean, divide by sd, per col
+norm_vals <- t(scale(t(val_list)))                # subtract by mean, divide by sd, per col
 
 #Deduplicate data questions
-x <- na.omit(cbind(id_list,norm_vals))	# remove people who answer the same, reinsert index col
-x_vals <- x[,2:length(x[1,])]			# i.e. na.omit(norm_vals)
+x <- na.omit(cbind(id_list,norm_vals))        # remove people who answer the same, reinsert index col
+x_vals <- x[,2:length(x[1,])]                        # i.e. na.omit(norm_vals)
 
 # Output correlation file
 corr_x <- cor(x_vals)
@@ -47,18 +47,18 @@ pca1_smr <- summary(pca1)
 pca1_axis <- sweep(pca1$rotation, MARGIN=2, pca1$sdev, FUN="*")
 write.csv(pca1_axis, "C:/Users/adam.nguyen/Documents/Segmentation/pca1_output.csv")
 
-#Plot PCA Component Vectors	
+#Plot PCA Component Vectors        
 par(mfrow=c(2,3))
 for (i in 1:6) {
 #for (i in 7:12) {
 #for (i in 13:18) {
-		barplot(pca1$rotation[,i],las=3, col="#990000", ylim=c(-1,1))
-	title(paste("PC",i))
+                barplot(pca1$rotation[,i],las=3, col="#990000", ylim=c(-1,1))
+        title(paste("PC",i))
 }
 
 # Setup for K-means
-num_comp <- 18						#select components that account for up to 80% variance
-x2 <- cbind(x[,1],pca1$x[,1:num_comp])	
+num_comp <- 18                                                #select components that account for up to 80% variance
+x2 <- cbind(x[,1],pca1$x[,1:num_comp])        
 x2_vals <- pca1$x[,1:num_comp]
 
 
@@ -69,43 +69,43 @@ print(max_cluster)
 # Check score for those clusters 
 p <- array()
 for (k in 2:max_cluster) {
-	km <- kmeans(x2_vals,k,100)
-	cntr <- km$centers
-	cls <- km$cluster
-	p_tmp <- 0
-	for (i in 1:k) {
-		x_i <- x2_vals[which(cls==i),]
-		c_i <- cntr[i,]
-		d_i_tmp <- array()
-		for (idx in 1:length(x_i[,1])){
-			d_i_tmp[idx] <- sqrt(sum((x_i[idx,] - c_i)^2))
-		}
+        km <- kmeans(x2_vals,k,100)
+        cntr <- km$centers
+        cls <- km$cluster
+        p_tmp <- 0
+        for (i in 1:k) {
+                x_i <- x2_vals[which(cls==i),]
+                c_i <- cntr[i,]
+                d_i_tmp <- array()
+                for (idx in 1:length(x_i[,1])){
+                        d_i_tmp[idx] <- sqrt(sum((x_i[idx,] - c_i)^2))
+                }
 
-	d_i <- sum(d_i_tmp)/length(d_i_tmp)	# average euclidean distance to center for cluster i
+        d_i <- sum(d_i_tmp)/length(d_i_tmp)        # average euclidean distance to center for cluster i
 
-	tmp <- array()
+        tmp <- array()
 
-	for ( j in 1:k) {
-		if (i != j) {
-			x_j <- x2_vals[which(cls==i),]
-			c_j <- cntr[j,]
-			d_j_tmp <- array()
-			for (idx in 1:length(x_j[,1])){
-				d_j_tmp[idx] <- sqrt(sum((x_j[idx,] - c_j)^2))
-			}
+        for ( j in 1:k) {
+                if (i != j) {
+                        x_j <- x2_vals[which(cls==i),]
+                        c_j <- cntr[j,]
+                        d_j_tmp <- array()
+                        for (idx in 1:length(x_j[,1])){
+                                d_j_tmp[idx] <- sqrt(sum((x_j[idx,] - c_j)^2))
+                        }
 
-			d_j <- sum(d_j_tmp)/length(d_j_tmp) # average distance to center of cluster j!<-i 
+                        d_j <- sum(d_j_tmp)/length(d_j_tmp) # average distance to center of cluster j!<-i 
 
-			d_ij <- sqrt(sum((cntr[i,] - cntr[j,])^2)) # distance between i and j
-			tmp[j] <- (d_i + d_j)/d_ij 		# if this score is large, the given cluster of points "might as well" be in the other cluster
-			}
-		}
+                        d_ij <- sqrt(sum((cntr[i,] - cntr[j,])^2)) # distance between i and j
+                        tmp[j] <- (d_i + d_j)/d_ij                 # if this score is large, the given cluster of points "might as well" be in the other cluster
+                        }
+                }
 
-#		print(tmp)#
-#		print(max(tmp[!is.na(tmp)]))
-		p_tmp <- p_tmp + max(tmp[!is.na(tmp)])	# add the maximum (removing NA values), for all !=i clusters
-	}
-	p[k] <- p_tmp / k	# avg value for k
+#                print(tmp)#
+#                print(max(tmp[!is.na(tmp)]))
+                p_tmp <- p_tmp + max(tmp[!is.na(tmp)])        # add the maximum (removing NA values), for all !=i clusters
+        }
+        p[k] <- p_tmp / k        # avg value for k
 }
 
 plot(p, type="l", axes=F, main="Jain Dubes", xlab="k", ylab="Jain Dubes Metric")
@@ -126,14 +126,14 @@ convCenters <- km$centers%*%t(pca1$rotation)[1:num_comp,]
 dim(convCenters)
 par(mfrow=c(optimal_k,1))
 for (i in 1:optimal_k)
-	{
-	barplot(convCenters[i,])
-	title(paste("Cluster ",i))
-	}
+        {
+        barplot(convCenters[i,])
+        title(paste("Cluster ",i))
+        }
 write.csv(convCenters, "C:/Users/adam.nguyen/Documents/Segmentation/centers.csv")
 
 #### Demographic - % by gender, age, job + chisq test
-demoAdj <- na.omit(cbind(demo,norm_vals))[,1:6]	# remove people
+demoAdj <- na.omit(cbind(demo,norm_vals))[,1:6]        # remove people
 clusterDemo <- cbind(km$cluster,demoAdj)
 summDemo <- matrix(nrow=optimal_k,ncol=13)
 
@@ -141,23 +141,23 @@ pJob <- c(0.512,0.201,0.199,0.088)
 
 for (i in 1:optimal_k)
 {
-	clusterTemp <- clusterDemo[which(km$cluster==i),]
-	summDemo[i,1]<-length(which( clusterTemp[,3]==1))
-	summDemo[i,2]<-length(which( clusterTemp[,3]==2))
-	summDemo[i,3]<-chisq.test(summDemo[i,1:2])$p.value
+        clusterTemp <- clusterDemo[which(km$cluster==i),]
+        summDemo[i,1]<-length(which( clusterTemp[,3]==1))
+        summDemo[i,2]<-length(which( clusterTemp[,3]==2))
+        summDemo[i,3]<-chisq.test(summDemo[i,1:2])$p.value
 
-	summDemo[i,4]<-length(which( clusterTemp[,4]==20))
-	summDemo[i,5]<-length(which( clusterTemp[,4]==30))
-	summDemo[i,6]<-length(which( clusterTemp[,4]==40))
-	summDemo[i,7]<-length(which( clusterTemp[,4]==50))	
-	summDemo[i,8]<-chisq.test(summDemo[i,4:7])$p.value	
+        summDemo[i,4]<-length(which( clusterTemp[,4]==20))
+        summDemo[i,5]<-length(which( clusterTemp[,4]==30))
+        summDemo[i,6]<-length(which( clusterTemp[,4]==40))
+        summDemo[i,7]<-length(which( clusterTemp[,4]==50))        
+        summDemo[i,8]<-chisq.test(summDemo[i,4:7])$p.value        
 
-	summDemo[i,9]<-length(which( clusterTemp[,7]==1)) + length(which( clusterTemp[,7]==2)) + length(which( clusterTemp[,7]==3)) + length(which( clusterTemp[,7]==4)) + length(which( clusterTemp[,7]==5))
-	summDemo[i,10]<-length(which( clusterTemp[,7]==6)) + length(which( clusterTemp[,7]==7)) + length(which( clusterTemp[,7]==8))
-	summDemo[i,11]<-length(which( clusterTemp[,7]==9))
-	summDemo[i,12]<-length(which( clusterTemp[,7]==10))+length(which( clusterTemp[,7]==11))
+        summDemo[i,9]<-length(which( clusterTemp[,7]==1)) + length(which( clusterTemp[,7]==2)) + length(which( clusterTemp[,7]==3)) + length(which( clusterTemp[,7]==4)) + length(which( clusterTemp[,7]==5))
+        summDemo[i,10]<-length(which( clusterTemp[,7]==6)) + length(which( clusterTemp[,7]==7)) + length(which( clusterTemp[,7]==8))
+        summDemo[i,11]<-length(which( clusterTemp[,7]==9))
+        summDemo[i,12]<-length(which( clusterTemp[,7]==10))+length(which( clusterTemp[,7]==11))
 
-	summDemo[i,13]<-chisq.test(summDemo[i,9:12], p=pJob)$p.value
+        summDemo[i,13]<-chisq.test(summDemo[i,9:12], p=pJob)$p.value
 }
 
 summDemo
@@ -168,23 +168,23 @@ pJob <- c(0.078,0.328,0.057,0.023,0.026,0.153,0.043,0.005,0.199,0.069,0.019)
 
 for (i in 1:optimal_k)
 {
-	clusterTemp <- clusterDemo[which(km$cluster==i),]
-	summDemo[i,1]<-length(which( clusterTemp[,3]==1))
-	summDemo[i,2]<-length(which( clusterTemp[,3]==2))
-	summDemo[i,3]<-chisq.test(summDemo[i,1:2])$p.value
+        clusterTemp <- clusterDemo[which(km$cluster==i),]
+        summDemo[i,1]<-length(which( clusterTemp[,3]==1))
+        summDemo[i,2]<-length(which( clusterTemp[,3]==2))
+        summDemo[i,3]<-chisq.test(summDemo[i,1:2])$p.value
 
-	summDemo[i,4]<-length(which( clusterTemp[,4]==20))
-	summDemo[i,5]<-length(which( clusterTemp[,4]==30))
-	summDemo[i,6]<-length(which( clusterTemp[,4]==40))
-	summDemo[i,7]<-length(which( clusterTemp[,4]==50))	
-	summDemo[i,8]<-chisq.test(summDemo[i,4:7])$p.value	
+        summDemo[i,4]<-length(which( clusterTemp[,4]==20))
+        summDemo[i,5]<-length(which( clusterTemp[,4]==30))
+        summDemo[i,6]<-length(which( clusterTemp[,4]==40))
+        summDemo[i,7]<-length(which( clusterTemp[,4]==50))        
+        summDemo[i,8]<-chisq.test(summDemo[i,4:7])$p.value        
 
-	for (j in 1:11)
-	{
-		summDemo[i,8+j]<-length(which( clusterTemp[,7]==j))
-	}
-	
-	summDemo[i,20]<-chisq.test(summDemo[i,9:19], p=pJob)$p.value
+        for (j in 1:11)
+        {
+                summDemo[i,8+j]<-length(which( clusterTemp[,7]==j))
+        }
+        
+        summDemo[i,20]<-chisq.test(summDemo[i,9:19], p=pJob)$p.value
 
 }
 
