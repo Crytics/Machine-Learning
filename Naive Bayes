@@ -1,0 +1,59 @@
+############################################
+# Perform Naive Bayes Classification
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 12/17/2013
+# Updated at  : xx/xx/xxxx
+# Description : Naive Bayes on Species Data
+############################################
+
+##Predict for continuous variable data
+#Get data
+data(iris)
+
+#Look at the data
+pairs(iris[1:4],main="Iris Data (red=setosa,green=versicolor,blue=virginica)", pch=21, bg=c("red","green3","blue")[unclass(iris$Species)])
+summary(iris)
+head(iris)
+
+#Download required package
+install.packages("e1071")
+library(e1071)
+
+#Build classifier naiveBayes(matrix of independent data, vector of classes)
+classifier <- naiveBayes(iris[,1:4], iris[,5]) 
+predict(classifier, iris[,-5])
+
+#See results
+table(predict(classifier, iris[,-5]), iris[,5], dnn=list('predicted','actual'))
+
+#Returns class distribution of the data
+classifier$apriori
+
+#Returns means and standard deviations by species
+classifier$tables$Petal.Length
+
+#Plot the three distributions
+plot(function(x) dnorm(x, 1.462, 0.1736640), 0, 8, col="red", main="Petal length distribution for the 3 different species")
+curve(dnorm(x, 4.260, 0.4699110), add=TRUE, col="blue")
+curve(dnorm(x, 5.552, 0.5518947 ), add=TRUE, col = "green")
+
+##Predict for discrete variable data
+head(HairEyeColor)
+str(HairEyeColor)
+
+#Create mosaic plot of data
+mosaicplot(HairEyeColor)
+
+#Predict gender from other two variables using maximum likelihood
+margin.table(HairEyeColor, c(1,3))
+
+table(HairEyeColor)
+
+#Construct classifier
+classifier2 <- naiveBayes(HairEyeColor[,1:2], HairEyeColor[,3])
+
+classifier2 <- naiveBayes(sex ~ ., data=HairEyeColor)
+
+table(predict(classifier2, HairEyeColor), HairEyeColor, dnn=list('predicted','actual'))
