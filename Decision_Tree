@@ -1,0 +1,191 @@
+###################################
+# CHAID Analysis Loop
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 01/04/2014
+# Updated at  : 01/21/2014
+# Description : CHAID Sweep
+###################################
+
+#Clear Environment
+#rm(list = ls(all = TRUE))
+
+#Names of working directory and files
+myfolder <- "file"
+
+#Set Directory
+setInternet2(TRUE)
+Sys.setenv(language = "en")
+Sys.setenv(tz = 'UTC')
+options(max.print = 1000)
+setwd(myfolder)
+source(paste(c("S:/GH/", "library.R"), collapse = "")) #Get library
+source(paste(c("S:/GH/", "break_munging.txt"), collapse = "")) #Get tools
+
+#Organize files into a list
+files <- list.files(path = myfolder)
+files.list <- as.list(files)
+data.bulk <- NULL
+
+###Execute Loop
+for (z in 1:length(files.list)){
+
+data <- read.csv(paste(myfolder, files.list[z], sep = "")
+										,sep = ""
+										,na.strings = c(".", "NA", "", "?")
+										,strip.white = TRUE
+										,encoding = "UTF-8")
+
+#Simple Random Sample
+observations.ttl <- nrow(data)
+if (observations.ttl > 100000) {
+	index.sample <- sample(1:observations.ttl, 100000)
+	data <- data[order(index.sample), ]
+	index.count <- length(index.sample)
+} else {
+	index.count <- observations.ttl
+}
+
+#Create Training, Test, and Validation Sets
+data.list <- splitdf(data, train = .7, test = .3, seed = 321)
+data.list$validationset <- NULL
+
+#Filter out unusable columns
+data.numeric <- lapply(data.list, function(x) subset(x, select = c(-X.U.FEFF.easy_id, -request_url, -url_pattern)))
+
+#De-Factorization: Convert factor classes into integer classes
+for ( i in 1:length(data.numeric)){
+	for ( j in 1:length(data.numeric[[i]])){
+		if (class(data.numeric[[i]][, j]) == "factor"){
+				data.numeric[[i]][, j] <- as.integer(data.numeric[[i]][, j])
+		}
+	}
+}
+
+#Complete cases
+cases.ttl <- nrow(data.numeric$trainset)
+cases.complete <- length(which(complete.cases(data.numeric$trainset)))
+cases.incomplete <- cases.ttl - cases.complete
+cases <- cbind(cases.complete, cases.incomplete, cases.ttl)
+
+data.numeric <- lapply(data.numeric, function(x) x[which(complete.cases(x) == TRUE), ])
+
+#Filter out columns with zero variance
+data.numeric <- lapply(data.numeric, function(x) x[, apply(data.numeric$trainset, 2, var, na.rm = TRUE) != 0])
+
+#Create correlation matrix and de-duplicate
+features.cor <- names(data.numeric$trainset)
+features.cor <- paste("~ ", paste(features.cor, collapse = " + "), collapse = " ")
+data.formula <- as.formula(features.cor)
+cor.data <- rxCor(data.formula, data.numeric$trainset)
+indx <- findCorrelation(cor.data, cutoff = .9, verbose = FALSE)
+cor.removed <- as.data.frame(head(cor.data[, indx], 0))
+cor.data <- cor.data[, -indx]
+cor.data <- as.data.frame(cor.data)
+names.cor <- names(cor.data)
+data.clean <- lapply(data.numeric, function(x) subset(x, select = names.cor))
+
+
+#Converts into binary (CHAID)
+converts_tgt <- lapply(data.clean, function(x) subset(x, select = "converts"))
+
+#lapply(converts_tgt, table) # Check tables
+for (i in 1:2){
+	converts_tgt[[i]][converts_tgt[[i]] == 0] <- 0
+	converts_tgt[[i]][converts_tgt[[i]] > 0] <- 1
+	names(converts_tgt[[i]]) <- "converts_tgt"
+	#Add columns to dataset
+	data.clean[[i]] <- cbind(data.clean[[i]], converts_tgt[[i]])
+}
+
+#Check target threshold
+data.target <- lapply(data.clean, function(x) subset(x, select = "converts_tgt")) 
+data.theshold <- sapply(data.target, function(x) length(x[x == 1]) / nrow(x))
+
+#Discretization step into 5 bins
+quantile_tgt_cols <- names(subset(data.clean[[1]], select = c(-visits, -converts)))
+quantile_n <- 5
+data.chaid <- data.clean
+breaks <- lapply(data.chaid, function(x) lapply(x[, quantile_tgt_cols], get_breaks, quantile_n)) #Got breaks
+data.chaid <- lapply(data.chaid, function(x) lapply(x[, quantile_tgt_cols], mk_ctgry_quantile, quantile_n))
+data.chaid <- lapply(data.chaid, function(x) as.data.frame(x))
+
+
+##Build Model - CHAID
+#Create binary dataset
+chaid_in <- data.chaid
+chaid_in.factor <- lapply(chaid_in, function(x) apply(x, 2, factor))
+chaid_in.factor <- lapply(chaid_in.factor, as.data.frame) 
+
+#table(chaid_in.factor$testset$converts_tgt)
+
+#Recode into response factors
+for ( i in 1:2){
+	chaid_in.factor[[i]]$converts_tgt <- revalue(chaid_in.factor[[i]]$converts_tgt, c("1"="No", "2"="Yes", "3"="Yes", "4"="Yes", "5"="Yes"))	
+}
+#table(chaid_in.factor[[2]]$converts_tgt)
+
+#Execute CHAID
+ctrl <- chaid_control(alpha2 = 0.01, alpha3 = -1, alpha4 = 0.01,
+                     minsplit = 100, minbucket = 100, minprob = 0.01,
+                     stump = FALSE, maxheight = 3)
+
+
+#Select features for CHAID
+features.chaid <- names(subset(chaid_in.factor$trainset, select = -converts_tgt))
+features.chaid <- paste(features.chaid[-120], collapse = " + ")
+formula.chaid <- as.formula(paste0("converts_tgt ~ ", features.chaid))
+chaid.tree <- chaid(formula.chaid, data = chaid_in.factor$trainset, control = ctrl)
+
+#Predictions - CHAID
+chaid_in.factor$testset$converts_tgt_pred <- predict(chaid.tree, chaid_in.factor$testset)
+
+#Confusion Matrix for CHAID
+chaid.confusion <- confusionMatrix(chaid_in.factor$testset$converts_tgt_pred, chaid_in.factor$testset$converts_tgt)
+
+##Cohort Analysis via Decision Tree Segmentation
+#table(chaid.tree$fitted)
+chaid.fitted <- table(chaid.tree$fitted)
+chaid.fitted <- as.data.frame(chaid.fitted)
+
+#Conditional summation for conversions, conversion share, and group size
+for (i in 1:length(chaid.fitted$Freq)){
+	chaid.fitted$Node_size[i] <- sum(chaid.fitted$Freq[which(chaid.fitted$X.fitted. == chaid.fitted$X.fitted.[i])])
+	
+	chaid.fitted$Response_ttl[i] <- sum(chaid.fitted$Freq[which(chaid.fitted$X.response. == chaid.fitted$X.response.[i])])
+
+	chaid.fitted$Freq_share[i] <- sum(chaid.fitted$Freq[i] / nrow(chaid_in.factor$trainset))
+}
+
+#Create conversion columns
+chaid.fitted$CVR <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Node_size)
+chaid.fitted$Node_share <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Response_ttl)
+
+#Calculate Sales Estimate
+AOV <- sum(as.numeric(data.numeric$trainset$Y_pc_monetary + data.numeric$trainset$Y_mb_monetary)) / sum(as.numeric(data.numeric$trainset$Y_pc_frequency + data.numeric$trainset$Y_mb_frequency))
+chaid.fitted$Sales <- NULL
+for ( i in 1:length(chaid.fitted$CVR)){
+	if (chaid.fitted$X.response.[i] == "Yes"){
+		chaid.fitted$Sales[i] <- AOV * chaid.fitted$CVR[i] * nrow(chaid_in.factor$trainset)
+	} else {
+		chaid.fitted$Sales <- 0
+	}
+}
+
+#Rename Columns
+chaid.fitted <- rename(chaid.fitted, c("X.fitted." = "Tree_Node", "X.response." = "Target"))
+
+#Final tables
+data.bulk[[z]] <- list( name =  files.list[z],
+			data.theshold = data.theshold,
+			sample.ratio = percent(index.count / observations.ttl),
+			cases.train = cases,
+			AOV = AOV, 
+			cor.removed = cor.removed,
+			chaid.confusion = chaid.confusion,
+			chaid.fitted = chaid.fitted[rev(order(chaid.fitted$CVR)), ],
+			chaid.tree = chaid.tree)
+}
+
+print(data.bulk)
