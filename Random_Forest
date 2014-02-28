@@ -1,5 +1,5 @@
 ###################################
-# Banner Page Customer Analysis
+# Segmentation Analysis
 # ---------------------------------
 # Created by  : Adam Nguyen
 # Updated by  : Adam Nguyen
@@ -12,7 +12,7 @@
 #rm(list = ls(all = TRUE))
 
 #Names of working directory and files
-myfolder <- "C:/Users/adam.nguyen/Desktop/Top Page Recommendations/Banner3/"
+myfolder <- "file"
 
 #Set Directory
 setInternet2(TRUE)
@@ -32,10 +32,10 @@ files.list <- as.list(files)
 for (z in 1:length(files.list)){
 
 data <- read.csv(paste(myfolder, files.list[z], sep = "")
-										,sep = ""
-										,na.strings = c(".", "NA", "", "?")
-										,strip.white = TRUE
-										,encoding = "UTF-8")
+	,sep = ""
+	,na.strings = c(".", "NA", "", "?")
+	,strip.white = TRUE
+	,encoding = "UTF-8")
 
 #Simple Random Sample
 observations.ttl <- nrow(data)
