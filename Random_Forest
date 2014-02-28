@@ -1,0 +1,218 @@
+###################################
+# Banner Page Customer Analysis
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 02/21/2014
+# Updated at  : 02/27/2014
+# Description : Random Forest
+###################################
+
+#Clear Environment
+#rm(list = ls(all = TRUE))
+
+#Names of working directory and files
+myfolder <- "C:/Users/adam.nguyen/Desktop/Top Page Recommendations/Banner3/"
+
+#Set Directory
+setInternet2(TRUE)
+Sys.setenv(language = "en")
+Sys.setenv(tz = 'UTC')
+options(max.print = 500)
+setwd(myfolder)
+source(paste(c("C:/Users/adam.nguyen/Desktop/GH/", "library.R"), collapse = "")) #Get library
+source(paste(c("C:/Users/adam.nguyen/Desktop/GH/", "break_munging.txt"), collapse = "")) #Get tools
+
+#Organize files into a list
+data.bulk <- NULL
+files <- list.files(path = myfolder)
+files.list <- as.list(files)
+
+###Execute Loop
+for (z in 1:length(files.list)){
+
+data <- read.csv(paste(myfolder, files.list[z], sep = "")
+										,sep = ""
+										,na.strings = c(".", "NA", "", "?")
+										,strip.white = TRUE
+										,encoding = "UTF-8")
+
+#Simple Random Sample
+observations.ttl <- nrow(data)
+if (observations.ttl > 100000) {
+	index.sample <- sample(1:observations.ttl, 100000)
+	data <- data[order(index.sample), ]
+	index.count <- length(index.sample)
+} else {
+	index.count <- observations.ttl
+}
+
+#Create Training, Test, and Validation Sets
+data.list <- splitdf(data, train = .7, test = .3, seed = 321)
+data.list$validationset <- NULL
+
+#Filter out unusable columns
+data.numeric <- lapply(data.list, function(x) subset(x, select = c(-X.U.FEFF.easy_id, -request_url, -url_pattern)))
+
+#De-Factorization: Convert factor classes into integer classes
+for ( i in 1:length(data.numeric)){
+	for ( j in 1:length(data.numeric[[i]])){
+		if (class(data.numeric[[i]][, j]) == "factor"){
+				data.numeric[[i]][, j] <- as.integer(data.numeric[[i]][, j])
+		}
+	}
+}
+
+
+#Complete cases
+cases.ttl <- nrow(data.numeric$trainset)
+cases.complete <- length(which(complete.cases(data.numeric$trainset)))
+cases.incomplete <- cases.ttl - cases.complete
+cases <- cbind(cases.complete, cases.incomplete, cases.ttl)
+
+data.numeric <- lapply(data.numeric, function(x) x[which(complete.cases(x) == TRUE), ])
+
+#Filter out columns with zero variance
+data.numeric <- lapply(data.numeric, function(x) x[, apply(data.numeric$trainset, 2, var, na.rm = TRUE) != 0])
+
+#Create correlation matrix and de-duplicate
+features.cor <- names(data.numeric$trainset)
+features.cor <- paste("~ ", paste(features.cor, collapse = " + "), collapse = " ")
+data.formula <- as.formula(features.cor)
+cor.data <- rxCor(data.formula, data.numeric$trainset)
+indx <- findCorrelation(cor.data, cutoff = .9, verbose = FALSE)
+cor.removed <- as.data.frame(head(cor.data[, indx], 0))
+cor.data <- cor.data[, -indx]
+cor.data <- as.data.frame(cor.data)
+names.cor <- names(cor.data)
+data.clean <- lapply(data.numeric, function(x) subset(x, select = names.cor))
+
+
+#Converts into binary (DForest)
+converts_tgt <- lapply(data.clean, function(x) subset(x, select = "converts"))
+
+#lapply(converts_tgt, table) # Check tables
+for (i in 1:2){
+	converts_tgt[[i]][converts_tgt[[i]] == 0] <- 0
+	converts_tgt[[i]][converts_tgt[[i]] > 0] <- 1
+	names(converts_tgt[[i]]) <- "converts_tgt"
+	#Add columns to dataset
+	data.clean[[i]] <- cbind(data.clean[[i]], converts_tgt[[i]])
+}
+
+#Check target threshold
+data.target <- lapply(data.clean, function(x) subset(x, select = "converts_tgt")) 
+data.theshold <- sapply(data.target, function(x) length(x[x == 1]) / nrow(x))
+
+#Discretization step into 5 bins
+quantile_tgt_cols <- names(subset(data.clean[[1]], select = c(-converts, -user_rank, -gender_cd)))
+quantile_n <- 10
+data.DForest <- data.clean
+breaks <- lapply(data.DForest, function(x) lapply(x[, quantile_tgt_cols], get_breaks, quantile_n)) #Got breaks
+data.DForest <- lapply(data.DForest, function(x) lapply(x[, quantile_tgt_cols], mk_ctgry_quantile, quantile_n))
+data.DForest <- lapply(data.DForest, function(x) as.data.frame(x))
+
+#Convert add original factors
+data.DForest$trainset$user_rank <- as.factor(data.clean$trainset$user_rank)
+data.DForest$trainset$gender_cd <- as.factor(data.clean$trainset$gender_cd)
+data.DForest$testset$user_rank <- as.factor(data.clean$testset$user_rank)
+data.DForest$testset$gender_cd <- as.factor(data.clean$testset$gender_cd)
+
+
+
+##Build Model - Random Forest
+#Create binary dataset
+DForest_in <- data.DForest
+DForest_in.factor <- lapply(DForest_in, function(x) apply(x, 2, factor))
+DForest_in.factor <- lapply(DForest_in.factor, as.data.frame) 
+
+#table(DForest_in.factor$testset$converts_tgt)
+
+#Recode into response factors
+for ( i in 1:2){
+	DForest_in.factor[[i]]$converts_tgt <- revalue(DForest_in.factor[[i]]$converts_tgt, c(" 1" = "No", " 2" = "Yes", " 3" = "Yes", " 4" = "Yes", " 5" = " Yes", " 6" = "Yes", " 7" = "Yes", " 8" = "Yes", " 9" = "Yes", "10" = "Yes"))	
+}
+#table(DForest_in.factor[[2]]$converts_tgt)
+#data.clean <- lapply(data.clean, function(x) subset(x, select = c(-visits, -converts)))
+#data.clean <- lapply(data.clean, function(x) subset(x, select = c(-converts)))
+
+#Select features for DForest
+#Change data
+#DForest_in.factor <- NULL
+#DForest_in.factor <- data.clean
+features.DForest <- names(subset(DForest_in.factor$trainset, select = -converts_tgt))
+features.DForest <- paste(features.DForest, collapse = " + ")
+formula.DForest <- as.formula(paste0("converts_tgt ~ ", features.DForest))
+DForest.tree <- rxDForest(formula.DForest
+						,data = DForest_in.factor$trainset
+						,minSplit = 10
+						,maxDepth = 4
+						,nTree = 10
+						,importance = TRUE
+						,method = "class"
+				)
+
+#Predictions - DForest
+DForest_in.factor$testset$converts_tgt_pred <- rxPredict(DForest.tree, DForest_in.factor$testset)
+
+#Confusion Matrix for DForest
+DForest.confusion <- confusionMatrix(DForest_in.factor$testset$converts_tgt_pred[order(DForest_in.factor$testset$converts_tgt_pred), ], DForest_in.factor$testset$converts_tgt)
+
+#Order of Importance
+DForest.importance <- cbind(as.vector(row.names(DForest.tree$importance)), DForest.tree$importance)
+colnames(DForest.importance) <- c("features", "importance")
+DForest.importance <- DForest.importance[rev(order(DForest.importance$importance)), ]
+importance.set <- DForest.importance[which(DForest.importance$importance > 1), ]
+
+#Cut Key Variables
+table.cuts <- NULL
+lift <- NULL
+quantiles <- 10
+for (i in 1:nrow(importance.set)){
+	table.cuts[[i]] <- table(DForest_in.factor$trainset$converts_tgt, cut2(data.clean$trainset[, which(names(data.clean$trainset) == importance.set[i, 1])], g = quantiles))
+	lift[[i]] <- percent(round(table.cuts[[i]][2, ] / (table.cuts[[i]][2, ] + table.cuts[[i]][1, ]), 3))
+	table.cuts[[i]] <- rbind(table.cuts[[i]], colSums(table(DForest_in.factor$trainset$converts_tgt, cut2(data.clean$trainset[, which(names(data.clean$trainset) == importance.set[i, 1])], g = quantiles))))
+}
+
+#Create Cross Table of Best Features against Target
+cross.list <- NULL
+cross.grid <- NULL
+for (i in 1:nrow(importance.set)){
+#for (i in 2:2){
+	cross.names <- as.vector(c(as.character(importance.set[i, 1]), as.character(importance.set[i + 1, 1]), "converts_tgt"))
+	cross.data <- subset(DForest_in.factor$trainset, select = c(cross.names))
+	cross.table <- xtabs(~ cross.data[, 1] + cross.data[, 2] + cross.data[, 3], data = cross.data)
+	cross.ftable <- ftable(cross.table)
+	cross.summary <- summary(cross.table)
+
+	cross.data$cvrt <- (as.numeric(cross.data$converts_tgt) - 1 )
+	cross.data$ttl <- 1
+	cross.table.cvrt <- xtabs(cross.data[, 4] ~ cross.data[, 1] + cross.data[, 2], data = cross.data)
+	cross.table.ttl <- xtabs(cross.data[, 5] ~ cross.data[, 1] + cross.data[, 2], data = cross.data)
+	cross <- round(cross.table.cvrt / cross.table.ttl, 3)
+	cross.list[[i]] <- list(cross.names = cross.names,
+					cross.table.cvrt = cross.table.cvrt,
+					cross.table.ttl = cross.table.ttl,
+					cross = cross
+					)
+	cross.grid[[i]] <- apply(cross, 1:2, percent)
+	cross.grid[[i]] <- revalue(as.factor(cross.grid[[1]]), c("NaN%" = "0%", " " = "0%"))
+}
+names(table.cuts) <- row.names(importance.set)
+names(lift) <- row.names(importance.set)
+
+#Final tables
+data.bulk[[z]] <- list(name =  files.list[z],
+			data.theshold = data.theshold,
+			sample.ratio = percent(index.count / observations.ttl),
+			cases.train = cases,
+			cor.removed = cor.removed,
+			DForest.confusion = DForest.confusion,
+			DForest.importance = DForest.importance,
+			cross.list,
+			table.cuts = table.cuts,
+			lift = lift,
+			DForest.tree = DForest.tree)
+}
+
+print(data.bulk)
