@@ -1,0 +1,40 @@
+############################################
+# Lasso Regression
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 03/26/2014
+# Updated at  : 03/xx/2014
+# Description : Lasso Prediction
+############################################
+
+#Clear Environment
+#rm(list = ls(all = TRUE))
+
+#Names of working directory and files
+myfolder <- "C:/Users/adam.nguyen/Desktop/shop_detector/"
+
+#Set Directory
+setInternet2(TRUE)
+Sys.setenv(language = "en")
+Sys.setenv(tz = 'UTC')
+options(max.print = 1000)
+setwd(myfolder)
+source(paste(c("C:/Users/adam.nguyen/Desktop/GH/", "library.R"), collapse = "")) #Get library
+source(paste(c("C:/Users/adam.nguyen/Desktop/GH/", "break_munging.txt"), collapse = "")) #Get tools
+
+#Extra library
+library(lars)
+
+#Organize files into a list
+data(diabetes)
+head(diabetes)
+str(diabetes)
+names(diabetes$x)
+
+#lars regression
+data.lars <- lars(diabetes$x, diabetes$y, type = "lasso", trace = TRUE)
+plot.lars(data.lars)
+summary.lars(data.lars)
+coef.lars(data.lars)
+
