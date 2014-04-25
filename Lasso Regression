@@ -36,5 +36,5 @@ names(diabetes$x)
 data.lars <- lars(diabetes$x, diabetes$y, type = "lasso", trace = TRUE)
 plot.lars(data.lars)
 summary.lars(data.lars)
-coef.lars(data.lars)
+coef.lars(data.lars) 
 
