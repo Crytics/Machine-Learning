@@ -1,0 +1,40 @@
+###########################################
+# Factor Analysis
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 10/04/2014
+# Updated at  : xx/xx/xxxx
+# Description : Analytics Exercise
+###########################################
+
+#Clear Envisubronment
+#rm(list = ls(all = TRUE))
+
+#update.packages(ask = FALSE, dependencies = c('Suggests'))
+
+#Set Directory
+setInternet2(TRUE)
+Sys.setenv(language = "en", tz = 'UTC')
+options(max.print = 500)
+setwd("C:/Users/adam.nguyen/Desktop/")
+source(paste(c("C:/Users/adam.nguyen/Desktop/R/GH/", "library.R"), collapse = "")) #Get library
+source(paste(c("C:/Users/adam.nguyen/Desktop/R/GH/", "break_munging.txt"), collapse = "")) #Get tools
+
+data12 <- read.csv("sample_clustering2.csv")
+
+data12.clean <- data12[!apply(data12, 2, var) == 0]
+
+cluster <- factanal(data12.clean
+                    ,factors = 5
+                    ,rotation = "varimax"
+                    ,scores = "regression")
+cluster
+
+cluster.load  <- cluster$loadings[,1:2] 
+
+plot(cluster.load, type="n")
+
+print(cluster,cutoff=0,sort=FALSE)
+
+write(cluster$loadings,"cluster.csv",ncolumns=5)
