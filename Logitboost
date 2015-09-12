@@ -1,0 +1,82 @@
+############################################
+# College Survey Analysis Abridged
+# ---------------------------------
+# Created by  : Adam Nguyen
+# Updated by  : Adam Nguyen
+# Created at  : 09/13/2015
+# Updated at  : xx/xx/xxxx
+# Description : Chance algorithm
+############################################
+
+#Set Directory
+setInternet2(TRUE) #Use proxy
+Sys.setenv(language = "en", tz = 'UTC') #Set timezone
+options(max.print = 999) #Limit output to 999 lines
+setwd("C:/Users/Adam/Desktop/R") #Set working directory
+
+#Load packages
+library(caret) #use caret library
+
+##Functions
+#Create training and test sets
+splitdf <- function(dataframe, seed=NULL) {
+    if (!is.null(seed)) set.seed(seed)
+    index <- 1:nrow(dataframe)
+    trainindex <- sample(index, trunc(length(index)*.7))
+    trainset <- dataframe[trainindex, ]
+    testset <- dataframe[-trainindex, ]
+    list(trainset=trainset,testset=testset)
+}
+
+#Load CSV File
+data.raw <- read.csv("C:/Users/Adam/Desktop/Data/cleaned_data3.csv")
+
+##Data Cleaning
+#Check dataset for missing observations
+apply(data.raw, 2, function(x) sum(is.na(x))) #Should have no errors since I manually cleaned the data
+
+#Recode binary target variable into categorical variables
+data.raw$Chance[data.raw$Chance == 1] <- "Yes"
+data.raw$Chance[data.raw$Chance == "0"] <- "No"
+
+##Convert binary features into factors
+#Extract variable names
+data.names <- names(data.raw)
+
+#Select variables to convert into factors
+data.cat <- data.names[c(5, 10:19)]
+
+#Transform selected variables into factors
+for (i in 1:length(data.cat)){data.raw[data.cat[i]] <- as.factor(data.raw[, data.cat[i]])}
+
+#Remove duplicate rows
+data.unique <- unique(data.raw)
+
+#Remove unused "fit" variable
+data.unique <- data.unique[, 1:18]
+
+#Create training and test sets with randomization set for seed = 4755
+data.split <- splitdf(data.unique, seed = 4755)
+
+#Create separate train and test datasets
+data.train <- data.split$trainset #used to tune the algorithm coefficients
+data.test <- data.split$testset #used to test algorithm accuracy
+
+#Set "Control Settings" to repeat 10-fold cross-validation for 10-iterations
+fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+#Train Logitboost classification algorithm with "train dataset"
+data.glm <- train(Chance ~ ., data = data.train, method = "LogitBoost", trControl = fitControl)
+
+#Run classification algorithm with "raw" response
+data.predict <- predict(data.glm, newdata = data.split$testset, type = "raw")
+
+#Confirm "Accuracy" via Confusion Matrix
+confusionMatrix(data.test[, 18], data.predict)
+### 85.7%
+
+#Generate "Chance" predictions for "test dataset" with probability as output
+data.predict <- predict(data.glm, newdata = data.split$testset, type = "prob")
+
+#Print results for only "Yes" probabilities
+print(data.predict[, 2])
