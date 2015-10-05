@@ -3,7 +3,7 @@
 # ---------------------------------
 # Created by  : Adam Nguyen
 # Updated by  : Adam Nguyen
-# Created at  : 09/13/2015
+# Created at  : 10/06/2015
 # Updated at  : xx/xx/xxxx
 # Description : Chance algorithm
 ############################################
@@ -69,14 +69,23 @@ fitControl <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
 data.glm <- train(Chance ~ ., data = data.train, method = "LogitBoost", trControl = fitControl)
 
 #Run classification algorithm with "raw" response
-data.predict <- predict(data.glm, newdata = data.split$testset, type = "raw")
+#data.predict <- predict(data.glm, newdata = data.split$testset, type = "raw")
 
 #Confirm "Accuracy" via Confusion Matrix
-confusionMatrix(data.test[, 18], data.predict)
+#confusionMatrix(data.test[, 18], data.predict)
 ### 85.7%
 
 #Generate "Chance" predictions for "test dataset" with probability as output
 data.predict <- predict(data.glm, newdata = data.split$testset, type = "prob")
 
 #Print results for only "Yes" probabilities
-print(data.predict[, 2])
+#print(round(data.predict[, 2], 2))
+
+#Extract latest datapoint from the bottom row
+data.last <- data.split$testset[nrow(data.split$testset), ]
+
+#Predict last observation
+print(round(predict(data.glm, newdata = data.last, type = "prob")[, 2], 2))
+
+#Create package
+save(data.glm, file = "data_glm.rda")
