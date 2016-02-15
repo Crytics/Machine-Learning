@@ -52,7 +52,7 @@ data.list <- splitdf(data, train = .7, test = .3, seed = 321)
 data.list$validationset <- NULL
 
 #Filter out unusable columns
-data.numeric <- lapply(data.list, function(x) subset(x, select = c(-X.U.FEFF.easy_id, -request_url, -url_pattern)))
+data.numeric <- lapply(data.list, function(x) subset(x, select = c(-user_id, -request_url, -url_pattern)))
 
 #De-Factorization: Convert factor classes into integer classes
 for ( i in 1:length(data.numeric)){
@@ -105,7 +105,7 @@ data.target <- lapply(data.clean, function(x) subset(x, select = "converts_tgt")
 data.theshold <- sapply(data.target, function(x) length(x[x == 1]) / nrow(x))
 
 #Discretization step into 5 bins
-quantile_tgt_cols <- names(subset(data.clean[[1]], select = c(-converts, -user_rank, -gender_cd)))
+quantile_tgt_cols <- names(subset(data.clean[[1]], select = c(-converts, -rank, -sex)))
 quantile_n <- 10
 data.DForest <- data.clean
 breaks <- lapply(data.DForest, function(x) lapply(x[, quantile_tgt_cols], get_breaks, quantile_n)) #Got breaks
@@ -113,10 +113,10 @@ data.DForest <- lapply(data.DForest, function(x) lapply(x[, quantile_tgt_cols], 
 data.DForest <- lapply(data.DForest, function(x) as.data.frame(x))
 
 #Convert add original factors
-data.DForest$trainset$user_rank <- as.factor(data.clean$trainset$user_rank)
-data.DForest$trainset$gender_cd <- as.factor(data.clean$trainset$gender_cd)
-data.DForest$testset$user_rank <- as.factor(data.clean$testset$user_rank)
-data.DForest$testset$gender_cd <- as.factor(data.clean$testset$gender_cd)
+data.DForest$trainset$rank <- as.factor(data.clean$trainset$rank)
+data.DForest$trainset$sex <- as.factor(data.clean$trainset$sex)
+data.DForest$testset$rank <- as.factor(data.clean$testset$rank)
+data.DForest$testset$sex <- as.factor(data.clean$testset$sex)
 
 
 
