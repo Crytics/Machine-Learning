@@ -32,10 +32,10 @@ data.bulk <- NULL
 for (z in 1:length(files.list)){
 
 data <- read.csv(paste(myfolder, files.list[z], sep = "")
-										,sep = ""
-										,na.strings = c(".", "NA", "", "?")
-										,strip.white = TRUE
-										,encoding = "UTF-8")
+		,sep = ""
+		,na.strings = c(".", "NA", "", "?")
+		,strip.white = TRUE
+		,encoding = "UTF-8")
 
 #Simple Random Sample
 observations.ttl <- nrow(data)
@@ -52,7 +52,7 @@ data.list <- splitdf(data, train = .7, test = .3, seed = 321)
 data.list$validationset <- NULL
 
 #Filter out unusable columns
-data.numeric <- lapply(data.list, function(x) subset(x, select = c(-X.U.FEFF.easy_id, -request_url, -url_pattern)))
+data.numeric <- lapply(data.list, function(x) subset(x, select = c(-<user_id>, -request_url, -url_pattern)))
 
 #De-Factorization: Convert factor classes into integer classes
 for ( i in 1:length(data.numeric)){
@@ -122,7 +122,7 @@ chaid_in.factor <- lapply(chaid_in.factor, as.data.frame)
 
 #Recode into response factors
 for ( i in 1:2){
-	chaid_in.factor[[i]]$converts_tgt <- revalue(chaid_in.factor[[i]]$converts_tgt, c("1"="No", "2"="Yes", "3"="Yes", "4"="Yes", "5"="Yes"))	
+	chaid_in.factor[[i]]$converts_tgt <- revalue(chaid_in.factor[[i]]$converts_tgt, c("1"="No", "2"="Yes", "3"="Yes", "4"="Yes", "5"="Yes"))
 }
 #table(chaid_in.factor[[2]]$converts_tgt)
 
@@ -162,12 +162,12 @@ for (i in 1:length(chaid.fitted$Freq)){
 chaid.fitted$CVR <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Node_size)
 chaid.fitted$Node_share <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Response_ttl)
 
-#Calculate Sales Estimate
-AOV <- sum(as.numeric(data.numeric$trainset$Y_pc_monetary + data.numeric$trainset$Y_mb_monetary)) / sum(as.numeric(data.numeric$trainset$Y_pc_frequency + data.numeric$trainset$Y_mb_frequency))
+#Calculate
+value_units <- sum(as.numeric(data.numeric$trainset$pcm + data.numeric$trainset$mbm)) / sum(as.numeric(data.numeric$trainset$pcf + data.numeric$trainset$mbf))
 chaid.fitted$Sales <- NULL
 for ( i in 1:length(chaid.fitted$CVR)){
 	if (chaid.fitted$X.response.[i] == "Yes"){
-		chaid.fitted$Sales[i] <- AOV * chaid.fitted$CVR[i] * nrow(chaid_in.factor$trainset)
+		chaid.fitted$Sales[i] <- value_units * chaid.fitted$CVR[i] * nrow(chaid_in.factor$trainset)
 	} else {
 		chaid.fitted$Sales <- 0
 	}
@@ -181,7 +181,7 @@ data.bulk[[z]] <- list( name =  files.list[z],
 			data.theshold = data.theshold,
 			sample.ratio = percent(index.count / observations.ttl),
 			cases.train = cases,
-			AOV = AOV, 
+			value_units = value_units, 
 			cor.removed = cor.removed,
 			chaid.confusion = chaid.confusion,
 			chaid.fitted = chaid.fitted[rev(order(chaid.fitted$CVR)), ],
