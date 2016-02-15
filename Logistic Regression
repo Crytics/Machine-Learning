@@ -12,7 +12,7 @@
 #rm(list = ls(all = TRUE))
 
 #Names of working directory and files
-myfolder <- "C:/Users/adam.nguyen/Desktop/shop_detector/"
+myfolder <- "C:/Users/adam.nguyen/Desktop/anomaly_detector/"
 
 #Set Directory
 setInternet2(TRUE)
@@ -98,7 +98,7 @@ data.target <- lapply(data.clean, function(x) subset(x, select = "fake"))
 data.theshold <- sapply(data.target, function(x) length(x[x == 1]) / nrow(x))
 
 #Discretization step into 5 bins
-quantile_tgt_cols <- names(subset(data.numeric[[1]], select = c(-fake_review)))
+quantile_tgt_cols <- names(subset(data.numeric[[1]], select = c(-fake_info)))
 quantile_n <- 5
 data.chaid <- data.numeric
 breaks <- lapply(data.chaid, function(x) lapply(x[, quantile_tgt_cols], get_breaks, quantile_n)) #Got breaks
@@ -159,11 +159,11 @@ chaid.fitted$CVR <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Node_siz
 chaid.fitted$Node_share <- with(chaid.fitted, chaid.fitted$Freq / chaid.fitted$Response_ttl)
 
 #Calculate GMS Estimate
-AOV <- sum(as.numeric(data.numeric$trainset$Y_pc_monetary + data.numeric$trainset$Y_mb_monetary)) / sum(as.numeric(data.numeric$trainset$Y_pc_frequency + data.numeric$trainset$Y_mb_frequency))
-chaid.fitted$GMS <- NULL
+value_units <- sum(as.numeric(data.numeric$trainset$pcm + data.numeric$trainset$mbm)) / sum(as.numeric(data.numeric$trainset$pcf + data.numeric$trainset$mbf))
+chaid.fitted$Sales <- NULL
 for ( i in 1:length(chaid.fitted$CVR)){
 	if (chaid.fitted$X.response.[i] == "Yes"){
-		chaid.fitted$GMS[i] <- AOV * chaid.fitted$CVR[i] * nrow(chaid_in.factor$trainset)
+		chaid.fitted$GMS[i] <- value_units * chaid.fitted$CVR[i] * nrow(chaid_in.factor$trainset)
 	} else {
 		chaid.fitted$GMS <- 0
 	}
@@ -177,7 +177,7 @@ data.bulk[[z]] <- list( name =  files.list[z],
 			data.theshold = data.theshold,
 			sample.ratio = percent(index.count / observations.ttl),
 			cases.train = cases,
-			AOV = AOV, 
+			value_units = value_units, 
 			cor.removed = cor.removed,
 			chaid.confusion = chaid.confusion,
 			chaid.fitted = chaid.fitted[rev(order(chaid.fitted$CVR)), ],
